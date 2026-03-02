@@ -16,6 +16,7 @@ const GUILD_ID = process.env.GUILD_ID;
 // ===== CONFIG =====
 const KICK_CHANNEL = "geonidass";
 const LIVE_ROLE_ID = "1478159851480682496";
+const STREAM_CHANNEL_ID = "1258102959363854460";
 
 // ===== CLIENT =====
 const client = new Client({
@@ -110,10 +111,10 @@ client.on(Events.InteractionCreate, async interaction => {
     const embed = new EmbedBuilder()
         .setTitle("🔴 ¡Estoy en directo en Kick!")
         .setDescription(`[Entra ahora mismo 🔥](https://kick.com/${KICK_CHANNEL})`)
-        .setColor("Green");
-            .setImage("https://media.tenor.com/8QfX1p0lF0YAAAAd/gaming-live.gif");
+        .setColor("Green")
+        .setImage("https://media.tenor.com/8QfX1p0lF0YAAAAd/gaming-live.gif");
 
-        await channel.send({
+    await channel.send({
         content: `<@&${LIVE_ROLE_ID}>`,
         embeds: [embed]
     });
