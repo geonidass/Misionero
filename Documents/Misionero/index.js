@@ -105,17 +105,24 @@ client.on(Events.InteractionCreate, async interaction => {
 
     if (interaction.commandName === "live") {
 
-        const embed = new EmbedBuilder()
-            .setTitle("🔴 ¡Estoy en directo en Kick!")
-            .setDescription(`[Haz click aquí para entrar 🔥](https://kick.com/${KICK_CHANNEL})`)
-            .setColor("Green")
+    const channel = await client.channels.fetch(STREAM_CHANNEL_ID);
+
+    const embed = new EmbedBuilder()
+        .setTitle("🔴 ¡Estoy en directo en Kick!")
+        .setDescription(`[Entra ahora mismo 🔥](https://kick.com/${KICK_CHANNEL})`)
+        .setColor("Green");
             .setImage("https://media.tenor.com/8QfX1p0lF0YAAAAd/gaming-live.gif");
 
-        await interaction.reply({
-            content: `<@&${LIVE_ROLE_ID}>`,
-            embeds: [embed]
-        });
-    }
+        await channel.send({
+        content: `<@&${LIVE_ROLE_ID}>`,
+        embeds: [embed]
+    });
+
+    await interaction.reply({ 
+        content: "Notificación enviada en ｜・𝐒𝐭𝐫𝐞𝐚𝐦𝐬 ✅",
+        ephemeral: true 
+    });
+}
 });
 
 client.once(Events.ClientReady, () => {
