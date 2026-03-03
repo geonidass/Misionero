@@ -51,6 +51,73 @@ const rest = new REST({ version: '10' }).setToken(TOKEN);
     }
 })();
 
+// ===== SISTEMA DE ADVERTENCIAS Y TIMEOUT =====
+const userWarnings = new Map(); // Contador de infracciones
+
+client.on(Events.MessageCreate, async (message) => {
+    if (message.author.bot) return;
+
+    const userId = message.author.id;
+    const now = Date.now();
+
+    // --- VARIABLES DE CONTROL ---
+    if (!userMessages.has(userId)) userMessages.set(userId, []);
+    const timestamps = userMessages.get(userId);
+    timestamps.push(now);
+    const filtered = timestamps.filter(t => now - t < 5000);
+    userMessages.set(userId, filtered);
+
+    // --- Detección de spam ---
+    let isViolation = false;
+
+    // Anti Flood
+    if (filtered.length >= 5) isViolation = true;
+
+    // Anti Emoji Spam
+    const emojiCount = (message.content.match(/[\u{1F300}-\u{1FAFF}]/gu) || []).length;
+    if (emojiCount > 6) isViolation = true;
+
+    // Anti Mention Masiva
+    if (message.mentions.users.size >= 4) isViolation = true;
+
+    // Anti Texto Repetido
+    if (userLastMessage.get(userId) === message.content) isViolation = true;
+    userLastMessage.set(userId, message.content);
+
+    // Si hay infracción
+    if (isViolation) {
+        await message.delete().catch(() => {});
+
+        // Incrementar advertencia
+        let warnings = userWarnings.get(userId) || 0;
+        warnings += 1;
+        userWarnings.set(userId, warnings);
+
+        try {
+            const member = await message.guild.members.fetch(userId);
+
+            if (warnings === 1) {
+                const msg = await message.channel.send(`${member}, No hagas spam, papi`);
+                setTimeout(() => msg.delete().catch(() => {}), 5000);
+            } else if (warnings === 2) {
+                const msg = await message.channel.send(`${member}, Última vez, no lo hagas`);
+                setTimeout(() => msg.delete().catch(() => {}), 5000);
+            } else if (warnings >= 3) {
+                // Timeout de 1 minuto (60000 ms)
+                await member.timeout(60000, "Excedió límite de spam");
+                const msg = await message.channel.send(`${member}, te pusimos un timeout por spam`);
+                setTimeout(() => msg.delete().catch(() => {}), 5000);
+
+                // Reiniciar advertencias
+                userWarnings.set(userId, 0);
+            }
+
+        } catch (err) {
+            console.error("Error aplicando advertencia o timeout:", err);
+        }
+    }
+});
+
 // ===== SISTEMA AUTOMOD =====
 const userMessages = new Map();
 const userLastMessage = new Map();
