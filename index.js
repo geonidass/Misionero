@@ -19,6 +19,12 @@ const KICK_CHANNEL = "geonidass"; // tu canal de Kick
 const LIVE_ROLE_ID = "1478126063023423559"; // rol que se pingea
 const STREAM_CHANNEL_ID = "1258102959363854460"; // canal ｜・𝐒𝐭𝐫𝐞𝐚𝐦𝐬
 
+// ===== LIMITES CONFIGURABLES =====
+const MAX_MESSAGES_IN_TIME = 5;
+const TIME_WINDOW = 5000; // ms
+const MAX_EMOJIS = 6;
+const MAX_MENTIONS = 4;
+
 // ===== CLIENT =====
 const client = new Client({
     intents: [
@@ -52,43 +58,39 @@ const rest = new REST({ version: '10' }).setToken(TOKEN);
 })();
 
 // ===== SISTEMA DE ADVERTENCIAS Y TIMEOUT =====
-const userWarnings = new Map(); // Contador de infracciones
+const userWarnings = new Map(); 
+const userMessages = new Map();
+const userLastMessage = new Map();
 
 client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot) return;
 
     const userId = message.author.id;
     const now = Date.now();
+    let isViolation = false;
 
-    // --- VARIABLES DE CONTROL ---
+    // --- CONTROL DE FLOOD ---
     if (!userMessages.has(userId)) userMessages.set(userId, []);
     const timestamps = userMessages.get(userId);
     timestamps.push(now);
-    const filtered = timestamps.filter(t => now - t < 5000);
-    userMessages.set(userId, filtered);
+    const recent = timestamps.filter(t => now - t < TIME_WINDOW);
+    userMessages.set(userId, recent);
+    if (recent.length > MAX_MESSAGES_IN_TIME) isViolation = true;
 
-    // --- Detección de spam ---
-    let isViolation = false;
-
-    // Anti Flood
-    if (filtered.length >= 5) isViolation = true;
-
-    // Anti Emoji Spam
+    // --- Anti Emoji Spam ---
     const emojiCount = (message.content.match(/[\u{1F300}-\u{1FAFF}]/gu) || []).length;
-    if (emojiCount > 6) isViolation = true;
+    if (emojiCount > MAX_EMOJIS) isViolation = true;
 
-    // Anti Mention Masiva
-    if (message.mentions.users.size >= 4) isViolation = true;
+    // --- Anti Mention Masiva ---
+    if (message.mentions.users.size > MAX_MENTIONS) isViolation = true;
 
-    // Anti Texto Repetido
+    // --- Anti Texto Repetido ---
     if (userLastMessage.get(userId) === message.content) isViolation = true;
     userLastMessage.set(userId, message.content);
 
-    // Si hay infracción
+    // --- SI HUBO VIOLACION ---
     if (isViolation) {
         await message.delete().catch(() => {});
-
-        // Incrementar advertencia
         let warnings = userWarnings.get(userId) || 0;
         warnings += 1;
         userWarnings.set(userId, warnings);
@@ -103,49 +105,15 @@ client.on(Events.MessageCreate, async (message) => {
                 const msg = await message.channel.send(`${member}, Última vez, no lo hagas`);
                 setTimeout(() => msg.delete().catch(() => {}), 5000);
             } else if (warnings >= 3) {
-                // Timeout de 1 minuto (60000 ms)
                 await member.timeout(60000, "Excedió límite de spam");
                 const msg = await message.channel.send(`${member}, te pusimos un timeout por spam`);
                 setTimeout(() => msg.delete().catch(() => {}), 5000);
-
-                // Reiniciar advertencias
-                userWarnings.set(userId, 0);
+                userWarnings.set(userId, 0); // reset
             }
-
         } catch (err) {
             console.error("Error aplicando advertencia o timeout:", err);
         }
     }
-});
-
-// ===== SISTEMA AUTOMOD =====
-const userMessages = new Map();
-const userLastMessage = new Map();
-
-client.on(Events.MessageCreate, async (message) => {
-    if (message.author.bot) return;
-
-    const userId = message.author.id;
-    const now = Date.now();
-
-    // --- Anti Flood ---
-    if (!userMessages.has(userId)) userMessages.set(userId, []);
-    const timestamps = userMessages.get(userId);
-    timestamps.push(now);
-    const filtered = timestamps.filter(t => now - t < 5000);
-    userMessages.set(userId, filtered);
-    if (filtered.length >= 5) return await message.delete().catch(() => {});
-
-    // --- Anti Emoji Spam ---
-    const emojiCount = (message.content.match(/[\u{1F300}-\u{1FAFF}]/gu) || []).length;
-    if (emojiCount > 6) return await message.delete().catch(() => {});
-
-    // --- Anti Mention Masiva ---
-    if (message.mentions.users.size >= 4) return await message.delete().catch(() => {});
-
-    // --- Anti Texto Repetido ---
-    if (userLastMessage.get(userId) === message.content) return await message.delete().catch(() => {});
-    userLastMessage.set(userId, message.content);
 });
 
 // ===== SLASH COMMAND HANDLER =====
